@@ -1,0 +1,22 @@
+services:
+  github-runner-docker:
+    image: kkldream/github-runner-docker:org-1.0
+    container_name: github-runner-docker
+    working_dir: /actions-runner
+    environment:
+      - RUNNER_URL=https://github.com/<YOUR_ORG>
+      - RUNNER_TOKEN=<YOUR_TOKEN>
+      - RUNNER_GROUP=Default
+      - RUNNER_NAME=github-runner-docker
+      - RUNNER_LABELS=self-hosted,linux,x64,docker
+      - RUNNER_WORKDIR=_work
+      - RUNNER_REPLACE=true
+      - RUNNER_EPHEMERAL=false
+    restart: unless-stopped
+    user: "1001:1001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - runner_work:/actions-runner/_work
+
+volumes:
+  runner_work:
