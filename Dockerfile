@@ -20,7 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libstdc++6 \
     libunwind8 \
     liblttng-ust1 \
-    libcurl4 && rm -rf /var/lib/apt/lists/*
+    libcurl4 \
+    docker.io && rm -rf /var/lib/apt/lists/*
 
 # Work in actions-runner directory
 WORKDIR /actions-runner
@@ -33,6 +34,9 @@ RUN tar xzf actions-runner-linux-x64-2.328.0.tar.gz
 
 # Install runner dependencies
 RUN ./bin/installdependencies.sh
+
+# Verify docker CLI is available for job containers support
+RUN docker --version
 
 # Create non-root user and take ownership
 RUN groupadd -g 1001 runner && useradd -m -u 1001 -g runner runner && \
