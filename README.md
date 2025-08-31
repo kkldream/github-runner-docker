@@ -24,7 +24,6 @@ docker run --rm -it --name github-runner-docker \
   -e RUNNER_REPLACE=true \
   -e RUNNER_EPHEMERAL=false \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  -v runner_work:/actions-runner/_work \
   kkldream/github-runner-docker:org-1.0
 ```
 
@@ -56,7 +55,9 @@ docker compose down
 - `RUNNER_EPHEMERAL`：是否一次性 Runner（只跑一個 Job 後自動解除註冊），預設 `false`
 
 ## 注意事項
-- 若掛載至 `/actions-runner/_work`，請確保對 uid 1001/gid 1001 具寫入權限
+- 預設不持久化 `_work`。若你需要持久化，請確保掛載路徑擁有者為 `1001:1001`：
+  - 方式一：在正在運行的容器中修正 `chown -R 1001:1001 /actions-runner/_work`
+  - 方式二：離線用臨時容器調整 named volume 擁有者
 - 不要將含 `RUNNER_TOKEN` 的 `.env` 或 compose 檔提交至公開版本庫
 - 需要在 runner 內執行 Docker 時，請掛載 `/var/run/docker.sock`（安全性風險自行評估）
 
