@@ -1,6 +1,6 @@
 services:
   github-runner-docker:
-    image: kkldream/github-runner-docker:org-1.0
+    image: kkldream/github-runner-docker:org-1.1
     container_name: github-runner-docker
     working_dir: /actions-runner
     environment:

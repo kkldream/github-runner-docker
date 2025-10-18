@@ -24,7 +24,7 @@ docker run --rm -it --name github-runner-docker \
   -e RUNNER_REPLACE=true \
   -e RUNNER_EPHEMERAL=false \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  kkldream/github-runner-docker:org-1.0
+  kkldream/github-runner-docker:org-1.1
 ```
 
 > 建議用 `docker compose` 管理，見下方範例。
