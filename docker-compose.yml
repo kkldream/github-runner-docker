@@ -1,18 +1,30 @@
 services:
   github-runner-docker:
-    image: kkldream/github-runner-docker:org-1.1
+    build:
+      context: .
+    image: github-runner-docker:local
     container_name: github-runner-docker
     working_dir: /actions-runner
     environment:
-      - RUNNER_URL=https://github.com/<YOUR_ORG>
-      - RUNNER_TOKEN=<YOUR_TOKEN>
-      - RUNNER_GROUP=Default
-      - RUNNER_NAME=github-runner-docker
-      - RUNNER_LABELS=self-hosted,linux,x64,docker
-      - RUNNER_WORKDIR=_work
-      - RUNNER_REPLACE=true
-      - RUNNER_EPHEMERAL=false
+      RUNNER_URL: ${RUNNER_URL:?Set RUNNER_URL to a GitHub organization URL}
+      RUNNER_TOKEN_FILE: /run/secrets/runner_token
+      RUNNER_GROUP: ${RUNNER_GROUP:-Default}
+      RUNNER_NAME: ${RUNNER_NAME:-github-runner-docker}
+      RUNNER_LABELS: ${RUNNER_LABELS:-docker}
+      RUNNER_WORKDIR: ${RUNNER_WORKDIR:-_work}
+      RUNNER_REPLACE: ${RUNNER_REPLACE:-false}
+      RUNNER_EPHEMERAL: "false"
+      RUNNER_DOCKER_ENABLED: "false"
+    secrets:
+      - runner_token
     restart: unless-stopped
+    stop_grace_period: 2m
     user: "1001:1001"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+secrets:
+  runner_token:
+    file: ${RUNNER_TOKEN_FILE:-./secrets/runner_token}

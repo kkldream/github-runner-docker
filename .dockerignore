@@ -1,0 +1,12 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+secrets/
+_work/
+_diag/
+*.log
+README.md
+docs/
+tests/

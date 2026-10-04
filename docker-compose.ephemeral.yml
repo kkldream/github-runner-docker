@@ -1,0 +1,6 @@
+services:
+  github-runner-docker:
+    restart: "no"
+    environment:
+      RUNNER_EPHEMERAL: "true"
+      RUNNER_REPLACE: "false"
