@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: ShellCheck
+        run: shellcheck entrypoint.sh tests/*.sh
+
+      - name: Entrypoint lifecycle tests
+        run: bash tests/entrypoint_test.sh
+
+      - name: Validate Compose files
+        env:
+          RUNNER_URL: https://github.com/example-org
+          DOCKER_GID: "999"
+        run: |
+          mkdir -p secrets
+          printf '%s' 'test-token' > secrets/runner_token
+          docker compose config >/dev/null
+          docker compose -f docker-compose.yml -f docker-compose.docker.yml config >/dev/null
+          docker compose -f docker-compose.yml -f docker-compose.ephemeral.yml config >/dev/null
+
+      - name: Build image
+        run: docker build --pull --tag github-runner-docker:test .

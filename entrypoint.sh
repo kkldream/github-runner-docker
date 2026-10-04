@@ -5,26 +5,59 @@ log() {
   echo "[entrypoint] $*"
 }
 
-# Defaults are provided via Dockerfile ENV, but validate required ones here
+fail() {
+  echo "[entrypoint] ERROR: $*" >&2
+  exit 2
+}
+
+require_bool() {
+  local name="$1"
+  local value="$2"
+  case "$value" in
+    true|false) ;;
+    *) fail "${name} must be 'true' or 'false' (got: ${value})" ;;
+  esac
+}
+
 : "${RUNNER_URL:=}"
 : "${RUNNER_TOKEN:=}"
+: "${RUNNER_TOKEN_FILE:=}"
 : "${RUNNER_NAME:=github-runner-docker}"
 : "${RUNNER_GROUP:=Default}"
 : "${RUNNER_LABELS:=docker}"
 : "${RUNNER_WORKDIR:=_work}"
-: "${RUNNER_REPLACE:=true}"
+: "${RUNNER_REPLACE:=false}"
 : "${RUNNER_EPHEMERAL:=false}"
+: "${RUNNER_DOCKER_ENABLED:=false}"
+: "${RUNNER_MANUALLY_TRAP_SIG:=1}"
 
-if [[ -z "${RUNNER_URL}" || -z "${RUNNER_TOKEN}" ]]; then
-  echo "RUNNER_URL and RUNNER_TOKEN are required" >&2
-  exit 2
-fi
+require_bool RUNNER_REPLACE "${RUNNER_REPLACE}"
+require_bool RUNNER_EPHEMERAL "${RUNNER_EPHEMERAL}"
+require_bool RUNNER_DOCKER_ENABLED "${RUNNER_DOCKER_ENABLED}"
+
+validate_org_url() {
+  if [[ ! "${RUNNER_URL}" =~ ^https://github\.com/[^/]+/?$ ]]; then
+    fail "RUNNER_URL must be a GitHub organization URL such as https://github.com/example-org"
+  fi
+}
+
+load_registration_token() {
+  local token="${RUNNER_TOKEN}"
+
+  if [[ -n "${RUNNER_TOKEN_FILE}" ]]; then
+    [[ -r "${RUNNER_TOKEN_FILE}" ]] || fail "RUNNER_TOKEN_FILE is not readable: ${RUNNER_TOKEN_FILE}"
+    token="$(tr -d '\r\n' < "${RUNNER_TOKEN_FILE}")"
+  fi
+
+  [[ -n "${token}" ]] || fail "RUNNER_TOKEN or RUNNER_TOKEN_FILE is required for first-time configuration"
+  RUNNER_REGISTRATION_TOKEN="${token}"
+}
 
 config_runner() {
   local -a args=(
     --unattended
     --url "${RUNNER_URL}"
-    --token "${RUNNER_TOKEN}"
+    --token "${RUNNER_REGISTRATION_TOKEN}"
     --name "${RUNNER_NAME}"
     --labels "${RUNNER_LABELS}"
     --runnergroup "${RUNNER_GROUP}"
@@ -34,6 +67,7 @@ config_runner() {
   if [[ "${RUNNER_REPLACE}" == "true" ]]; then
     args+=(--replace)
   fi
+
   if [[ "${RUNNER_EPHEMERAL}" == "true" ]]; then
     args+=(--ephemeral)
   fi
@@ -41,20 +75,33 @@ config_runner() {
   ./config.sh "${args[@]}"
 }
 
-# Configure if needed, or replace if requested
-if [[ -f .runner ]]; then
-  if [[ "${RUNNER_REPLACE}" == "true" ]]; then
-    log "Existing configuration detected; reconfiguring (replace=true)"
-    config_runner
-  else
-    log "Existing configuration detected; skipping reconfiguration (replace=false)"
+preflight_docker_socket() {
+  [[ -S /var/run/docker.sock ]] || fail "RUNNER_DOCKER_ENABLED=true but /var/run/docker.sock is not mounted"
+
+  if ! docker info --format '{{.ServerVersion}}' >/dev/null 2>&1; then
+    fail "Docker daemon is not reachable. Check the socket mount and supplemental DOCKER_GID."
   fi
+}
+
+if [[ -f .runner ]]; then
+  if [[ "${RUNNER_EPHEMERAL}" == "true" ]]; then
+    fail "Refusing to reuse an existing .runner directory in ephemeral mode; start a fresh container instead"
+  fi
+  log "Existing runner configuration detected; keeping it unchanged"
 else
-  log "No existing configuration; configuring runner"
+  [[ -n "${RUNNER_URL}" ]] || fail "RUNNER_URL is required for first-time configuration"
+  validate_org_url
+  load_registration_token
+  log "No existing configuration detected; configuring runner"
   config_runner
 fi
 
-# Start the runner as PID 1 to receive signals properly
+unset RUNNER_TOKEN RUNNER_TOKEN_FILE RUNNER_REGISTRATION_TOKEN || true
+
+if [[ "${RUNNER_DOCKER_ENABLED}" == "true" ]]; then
+  preflight_docker_socket
+  log "Docker socket preflight succeeded"
+fi
+
+export RUNNER_MANUALLY_TRAP_SIG
 exec ./run.sh
-
-

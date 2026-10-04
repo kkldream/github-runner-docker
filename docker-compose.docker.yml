@@ -1,0 +1,8 @@
+services:
+  github-runner-docker:
+    environment:
+      RUNNER_DOCKER_ENABLED: "true"
+    group_add:
+      - "${DOCKER_GID:?Set DOCKER_GID to the host Docker socket group id}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
