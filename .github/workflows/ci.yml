@@ -19,8 +19,22 @@ jobs:
       - name: ShellCheck
         run: shellcheck entrypoint.sh tests/*.sh
 
+      - name: Harness syntax checks
+        run: |
+          bash -n entrypoint.sh
+          for script in tests/*.sh; do bash -n "$script"; done
+          perl -c tests/fixtures/FakeListener.pl
+
       - name: Entrypoint lifecycle tests
         run: bash tests/entrypoint_test.sh
+
+      - name: Acceptance harness fault regressions（不連線 Docker）
+        timeout-minutes: 5
+        env:
+          TMPDIR: ${{ runner.temp }}
+          # Artifact base only: each invocation prints its unique run-* child.
+          FAULT_ARTIFACT_DIR: ${{ runner.temp }}/runner-smoke-faults
+        run: python3 tests/container_smoke_fault_test.py
 
       - name: Validate Compose files
         env:
@@ -35,3 +49,23 @@ jobs:
 
       - name: Build image
         run: docker build --pull --tag github-runner-docker:test .
+
+      - name: 離線 actual-image 驗收（FAKE Listener）
+        timeout-minutes: 5
+        env:
+          TMPDIR: ${{ runner.temp }}
+          SMOKE_ARTIFACT_DIR: ${{ runner.temp }}/runner-container-smoke
+        run: bash tests/container_smoke_test.sh github-runner-docker:test
+
+      - name: 保留離線驗收證據
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: runner-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/runner-smoke-faults
+            ${{ runner.temp }}/runner-container-smoke
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
+          include-hidden-files: false
